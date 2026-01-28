@@ -1,0 +1,21 @@
+[project]
+name = "silicon-scope-aoi"
+version = "0.1.0"
+description = "A professional-grade TUI application for real-time Automated Optical Inspection (AOI) of electronics."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "opencv-python>=4.13.0.90",
+    "pydantic>=2.12.5",
+    "textual>=7.4.0",
+    "torch==2.10.0+cpu",
+    "ultralytics>=8.4.6",
+]
+
+[[tool.uv.index]]
+url = "https://pypi.org/simple"
+default = true
+
+[[tool.uv.index]]
+url = "https://download.pytorch.org/whl/cpu"
+

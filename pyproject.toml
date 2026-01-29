@@ -19,3 +19,8 @@ default = true
 [[tool.uv.index]]
 url = "https://download.pytorch.org/whl/cpu"
 
+[dependency-groups]
+dev = [
+    "mypy>=1.19.1",
+]
+

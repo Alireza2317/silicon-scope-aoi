@@ -1,0 +1,13 @@
+#main-container {
+    layout: vertical;
+}
+
+#video-feed {
+    height: 70%;
+    border: round #daa520;
+}
+
+#log-view {
+    height: 30%;
+    border: round white;
+}

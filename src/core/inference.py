@@ -5,7 +5,7 @@ This module contains the primary logic for loading the YOLOv8 model
 and performing object detection in a separate, non-blocking thread.
 """
 
-import queue
+import asyncio
 import threading
 from pathlib import Path
 from types import TracebackType
@@ -76,17 +76,18 @@ class InferenceEngine:
 	def __init__(
 		self,
 		config: InferenceConfig,
-		output_queue: queue.Queue[list[DetectionResult] | str],
+		output_queue: asyncio.Queue[list[DetectionResult] | str],
 	) -> None:
 		"""
 		Initializes the InferenceEngine with its configuration and output queue.
 
 		Args:
-		    config: Configuration object with model path and other settings.
-		    output_queue: A thread-safe queue to send results or errors to the UI.
+			config: Configuration object with model path and other settings.
+			output_queue: A thread-safe queue to send results or errors to the UI.
 		"""
 		self.config = config
 		self._output_queue = output_queue
+		self._loop: asyncio.AbstractEventLoop | None = None
 		self._stop_event = threading.Event()
 		self._model: YOLO | None = None
 		self._frame_to_process: np.ndarray | None = None
@@ -116,20 +117,45 @@ class InferenceEngine:
 		self.stop()
 
 	def start(self) -> None:
-		"""Starts the background inference thread."""
+		"""
+		Starts the background inference thread.
+
+		It captures the running asyncio event loop from the calling thread (expected
+		to be the main UI thread). This loop is used to safely dispatch inference
+		results back to the async UI components.
+		"""
 		if self._thread is not None and self._thread.is_alive():
 			return  # Thread is already running
+
+		try:
+			self._loop = asyncio.get_running_loop()
+		except RuntimeError:
+			raise RuntimeError(
+				f"{self.__class__.__name__}.start() must be called from a running"
+				+ " asyncio event loop."
+			)
 
 		self._thread = threading.Thread(target=self._run_loop, daemon=True)
 		self._thread.start()
 
+	def stop(self) -> None:
+		"""Signals the inference thread to stop gracefully and waits for it to finish."""
+		self._stop_event.set()
+		if self._thread is not None:
+			self._thread.join()
+
 	def _run_loop(self) -> None:
 		"""
-		The main loop of the inference thread.
+		The main loop for the background inference thread.
 
-		Loads the model and then enters a loop, continuously processing
-		the most recent frame provided to the engine.
+		This method runs in a separate thread. It loads the model and then enters a
+		loop, continuously processing the most recent frame. It uses the captured
+		event loop from the main thread to safely put results into the asyncio queue.
 		"""
+		if not self._loop:
+			# This should not be reachable if start() is used correctly.
+			return
+
 		try:
 			self._model = YOLO(self.config.model_path)
 			# Perform a dummy prediction to initialize the model
@@ -139,7 +165,10 @@ class InferenceEngine:
 			)
 			self._model(dummy_img, imgsz=self.config.image_size, verbose=False)
 		except Exception as e:
-			self._output_queue.put(f"ERROR: Failed to load model: {e}")
+			error_message: str = f"ERROR: Failed to load model: {e}"
+			self._loop.call_soon_threadsafe(
+				self._output_queue.put_nowait, error_message
+			)
 			return
 
 		while not self._stop_event.is_set():
@@ -151,9 +180,9 @@ class InferenceEngine:
 
 			if frame is not None:
 				results: list[DetectionResult] = self._process_frame(frame)
-				self._output_queue.put(results)
+				self._loop.call_soon_threadsafe(self._output_queue.put_nowait, results)
 			else:
-				# Wait briefly to prevent busy-waiting and yield CPU when no frames are available.
+				# Wait briefly to prevent busy-waiting when no frames are available.
 				self._stop_event.wait(0.01)
 
 	def _process_frame(self, frame: np.ndarray) -> list[DetectionResult]:
@@ -161,10 +190,10 @@ class InferenceEngine:
 		Processes a single image frame to perform object detection.
 
 		Args:
-		    frame: The input image frame in NumPy array format.
+			frame: The input image frame in NumPy array format.
 
 		Returns:
-		    A list of DetectionResult objects for all valid detections.
+			A list of DetectionResult objects for all valid detections.
 		"""
 		if self._model is None:
 			return []
@@ -185,7 +214,7 @@ class InferenceEngine:
 					continue  # Skip malformed results
 
 				(x1, y1, x2, y2, confidence, class_id_float) = row
-				class_id = int(class_id_float)
+				class_id: int = int(class_id_float)
 
 				detections.append(
 					DetectionResult(
@@ -199,18 +228,19 @@ class InferenceEngine:
 
 	def submit_frame(self, frame: np.ndarray) -> None:
 		"""
-		Submits a new frame to be processed by the inference thread.
-
-		This method is thread-safe.
+		Submits a new frame for processing. This is thread-safe.
 
 		Args:
-		    frame: The latest frame captured from the camera.
+		    frame: The latest camera frame.
 		"""
 		with self._frame_lock:
 			self._frame_to_process = frame
 
-	def stop(self) -> None:
-		"""Signals the inference thread to stop gracefully and waits for it to finish."""
-		self._stop_event.set()
-		if self._thread is not None:
-			self._thread.join()
+	def is_loop_running(self) -> bool:
+		"""
+		Checks if the internal event loop is running.
+
+		Returns:
+			True if the event loop is running, False otherwise.
+		"""
+		return (self._loop is not None) and self._loop.is_running()

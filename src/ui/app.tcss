@@ -4,7 +4,7 @@
 
 #video-feed {
     height: 70%;
-    border: round #daa520;
+    border: round white;
 }
 
 #log-view {

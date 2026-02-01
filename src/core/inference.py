@@ -89,6 +89,7 @@ class InferenceEngine:
 		self._output_queue = output_queue
 		self._loop: asyncio.AbstractEventLoop | None = None
 		self._stop_event = threading.Event()
+		self.started_event = threading.Event()
 		self._model: YOLO | None = None
 		self._frame_to_process: np.ndarray | None = None
 		self._frame_lock = threading.Lock()
@@ -137,6 +138,7 @@ class InferenceEngine:
 
 		self._thread = threading.Thread(target=self._run_loop, daemon=True)
 		self._thread.start()
+		self.started_event.set()
 
 	def stop(self) -> None:
 		"""Signals the inference thread to stop gracefully and waits for it to finish."""
@@ -179,8 +181,16 @@ class InferenceEngine:
 					self._frame_to_process = None  # Consume the frame
 
 			if frame is not None:
-				results: list[DetectionResult] = self._process_frame(frame)
-				self._loop.call_soon_threadsafe(self._output_queue.put_nowait, results)
+				try:
+					results: list[DetectionResult] = self._process_frame(frame)
+					self._loop.call_soon_threadsafe(
+						self._output_queue.put_nowait, results
+					)
+				except Exception as e:
+					error_message = f"ERROR: Failed to process frame: {e}"
+					self._loop.call_soon_threadsafe(
+						self._output_queue.put_nowait, error_message
+					)
 			else:
 				# Wait briefly to prevent busy-waiting when no frames are available.
 				self._stop_event.wait(0.01)

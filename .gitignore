@@ -10,3 +10,9 @@ wheels/
 .venv
 
 GEMINI.md
+
+*.png
+
+models/
+
+*.log

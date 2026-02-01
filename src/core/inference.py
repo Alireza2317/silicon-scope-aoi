@@ -58,10 +58,10 @@ class InferenceConfig(BaseModel):
 		Path("models/yolov8n.pt"), description="Path to the YOLOv8 model weights"
 	)
 	confidence_threshold: float = Field(
-		0.30, ge=0.0, le=1.0, description="Minimum confidence for detection"
+		0.5, ge=0.0, le=1.0, description="Minimum confidence for detection"
 	)
 	image_size: int = Field(
-		640, gt=0, description="The size for inference input images"
+		320, gt=0, description="The size for inference input images"
 	)
 
 

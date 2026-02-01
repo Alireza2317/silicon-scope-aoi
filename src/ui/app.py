@@ -11,6 +11,7 @@ from textual.binding import Binding
 if TYPE_CHECKING:
 	from src.core.inference import InferenceEngine, QueueItem
 from src.ui.screens import MainScreen
+from src.ui.video_window import VideoWindow
 
 
 class SiliconScopeApp(App[None]):
@@ -31,8 +32,9 @@ class SiliconScopeApp(App[None]):
 		self.results_queue = output_queue
 		self.inference_engine = inference_engine
 
-		# screens
+		# UI Components
 		self.main_screen = MainScreen()
+		self.video_window = VideoWindow()
 
 	def on_mount(self) -> None:
 		"""Called when the app is first mounted."""
@@ -44,6 +46,7 @@ class SiliconScopeApp(App[None]):
 	def on_unmount(self) -> None:
 		"""Called when the app is unmounted to clean up resources."""
 		self.inference_engine.stop()
+		self.video_window.close()
 
 	async def process_results(self) -> None:
 		"""Fetches results from the queue and updates the UI."""
@@ -57,7 +60,8 @@ class SiliconScopeApp(App[None]):
 				# It's a frame and its detections
 				frame, detections = result
 				self.main_screen.log_palette.update_log(detections)
-				self.main_screen.video_feed.update_feed(frame, detections)
+
+				self.video_window.update(frame, detections)
 
 		except asyncio.QueueEmpty:
 			pass  # No new results, do nothing.

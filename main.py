@@ -1,50 +1,32 @@
 import asyncio
 import logging
-import random
 import threading
 import time
+from collections.abc import Generator
 
-import cv2
 import numpy as np
-from matplotlib import pyplot as plt
 
 from src.core.inference import DetectionResult, InferenceConfig, InferenceEngine
+from src.sources.camera import generate_camera_frames
 from src.ui.app import SiliconScopeApp
 
 
-def dummy_feed(
+def feed_worker(
+	frame_generator: Generator[np.ndarray, None, None],
 	engine: InferenceEngine,
 	stop_event: threading.Event,
-	engine_started_event: threading.Event,
 ) -> None:
-	"""Generates and submits dummy frames to the inference engine."""
-	# Wait for the inference engine to be started by the app.
-	engine_started_event.wait()
+	"""
+	Consumes frames from a generator and submits them to the inference engine.
+	"""
+	engine.started_event.wait()  # Wait for the engine to be ready
 
-	while not stop_event.is_set():
-		try:
-			# read dummy image as a np array
-			frame = plt.imread(random.choice(('p.png', 'pic.png')))
+	for frame in frame_generator:
+		if stop_event.is_set():
+			break
+		engine.submit_frame(frame)
 
-			# Ensure the frame is in 3-channel, uint8 format
-			if frame.ndim == 2:  # Grayscale
-				frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
-			elif frame.shape[2] == 4:  # RGBA
-				frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
-
-			if frame.dtype != np.uint8:
-				frame = (frame * 255).astype(np.uint8)
-
-			engine.submit_frame(frame)
-		except FileNotFoundError:
-			logging.exception(
-				"ERROR: image not found. Make sure it is in the root directory."
-			)
-			stop_event.set()  # Stop the feed if the image is missing
-		except Exception:
-			logging.exception("ERROR in dummy_feed")
-
-		time.sleep(1)
+		time.sleep(0.5)
 
 
 def main() -> None:
@@ -63,17 +45,18 @@ def main() -> None:
 	inference_engine = InferenceEngine(inference_config, inference_queue)
 	app = SiliconScopeApp(inference_queue, inference_engine)
 
-	# Start the dummy feed thread. It will wait for the engine's started_event.
+	# Create the frame generator and the worker thread.
+	camera_generator = generate_camera_frames()
 	feed_thread = threading.Thread(
-		target=dummy_feed,
-		args=(inference_engine, stop_event, inference_engine.started_event),
+		target=feed_worker,
+		args=(camera_generator, inference_engine, stop_event),
 		daemon=True,
 	)
 	feed_thread.start()
 
 	app.run()
 
-	# Signal the dummy feed to stop and wait for it.
+	# Signal the camera feed to stop and wait for it.
 	stop_event.set()
 	feed_thread.join()
 

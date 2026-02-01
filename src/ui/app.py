@@ -1,6 +1,7 @@
 """The main application class for the Silicon-Scope AOI tool."""
 
 import asyncio
+import threading
 import time
 from collections import deque
 from typing import Deque
@@ -18,6 +19,7 @@ class SiliconScopeApp(App[None]):
 
 	CSS_PATH = "app.tcss"
 	BINDINGS = [
+		Binding(key="space", action="toggle_pause", description="Pause/Resume"),
 		Binding(key="ctrl+l", action="toggle_log", description="Toggle Log"),
 		Binding(key="q", action="quit", description="Quit"),
 	]
@@ -26,11 +28,16 @@ class SiliconScopeApp(App[None]):
 		self,
 		output_queue: asyncio.Queue[tuple[Frame, list[DetectionResult]] | str],
 		inference_engine: InferenceEngine,
+		resume_event: threading.Event,
 	) -> None:
 		"""Initializes the application."""
 		super().__init__()
 		self.results_queue = output_queue
 		self.inference_engine = inference_engine
+
+		# Control Events
+		self.resume_event = resume_event
+		self.is_paused = False
 
 		# UI Components
 		self.main_screen = MainScreen()
@@ -41,13 +48,22 @@ class SiliconScopeApp(App[None]):
 		"""Called when the app is first mounted."""
 		self.inference_engine.start()
 		self.push_screen(self.main_screen)
-		self.set_interval(1 / 60, self.process_results)
+		self.set_interval(1 / 30, self.process_results)
 		self.set_interval(1.0, self.update_fps)
 
 	def on_unmount(self) -> None:
 		"""Called when the app is unmounted to clean up resources."""
 		self.inference_engine.stop()
 		self.video_window.close()
+
+		# setting the resume event to let the thread continue running if paused
+		self.resume_event.set()
+
+	def action_toggle_pause(self) -> None:
+		"""Toggles the paused state of the camera feed."""
+		self.is_paused = not self.is_paused
+		self.resume_event.clear() if self.is_paused else self.resume_event.set()
+
 
 	def update_fps(self) -> None:
 		"""Calculates and updates the FPS display."""

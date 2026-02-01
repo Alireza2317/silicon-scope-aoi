@@ -19,6 +19,7 @@ def feed_worker(
 	frame_generator: Generator[np.ndarray, None, None],
 	engine: InferenceEngine,
 	stop_event: threading.Event,
+	resume_event: threading.Event,
 ) -> None:
 	"""
 	Consumes frames from a generator and submits them to the inference engine.
@@ -28,6 +29,10 @@ def feed_worker(
 	for frame in frame_generator:
 		if stop_event.is_set():
 			break
+
+		# If the resume event is not set(cleared), wait until it is set.
+		resume_event.wait()
+
 		engine.submit_frame(frame)
 
 		time.sleep(0.01)
@@ -45,15 +50,19 @@ def main() -> None:
 	inference_queue: asyncio.Queue[QueueItem] = asyncio.Queue()
 	inference_config = InferenceConfig()  # type: ignore
 	stop_event = threading.Event()
+	resume_event = threading.Event()
+
+	# starting in the running state
+	resume_event.set()
 
 	inference_engine = InferenceEngine(inference_config, inference_queue)
-	app = SiliconScopeApp(inference_queue, inference_engine)
+	app = SiliconScopeApp(inference_queue, inference_engine, resume_event)
 
 	# Create the frame generator and the worker thread.
 	camera_generator = generate_camera_frames()
 	feed_thread = threading.Thread(
 		target=feed_worker,
-		args=(camera_generator, inference_engine, stop_event),
+		args=(camera_generator, inference_engine, stop_event, resume_event),
 		daemon=True,
 	)
 	feed_thread.start()

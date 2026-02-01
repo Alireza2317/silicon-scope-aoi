@@ -8,7 +8,7 @@ import cv2
 from PIL import Image
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Container, Vertical
+from textual.containers import Container
 from textual.screen import Screen
 from textual.widget import Widget
 from textual.widgets import Footer, Header, Log, Static
@@ -125,6 +125,7 @@ class MainScreen(Screen[None]):
 		self.stats_widget = DetectionStats("Detections Found: [b]0[/b]", id="stats")
 		self.fps_widget = FPSDisplay("Inference FPS: [b]0.00[/b]", id="fps")
 		self.log_widget = Log(max_lines=500, id="log")
+		self.footer = Footer()
 
 	def compose(self) -> ComposeResult:
 		"""Compose the layout of the main screen."""
@@ -135,4 +136,4 @@ class MainScreen(Screen[None]):
 			Container(self.log_widget, id="log-container"),
 			id="main-grid",
 		)
-		yield Footer()
+		yield self.footer

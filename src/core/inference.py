@@ -16,6 +16,8 @@ from pydantic import BaseModel, Field
 from ultralytics.models import YOLO
 
 type BoxCoordinate = tuple[float, float, float, float]
+type Frame = np.ndarray
+type QueueItem = tuple[Frame, list[DetectionResult]] | str
 
 
 class DetectionResult(BaseModel):
@@ -76,7 +78,7 @@ class InferenceEngine:
 	def __init__(
 		self,
 		config: InferenceConfig,
-		output_queue: asyncio.Queue[list[DetectionResult] | str],
+		output_queue: asyncio.Queue[QueueItem],
 	) -> None:
 		"""
 		Initializes the InferenceEngine with its configuration and output queue.
@@ -174,7 +176,7 @@ class InferenceEngine:
 			return
 
 		while not self._stop_event.is_set():
-			frame: np.ndarray | None = None
+			frame: Frame | None = None
 			with self._frame_lock:
 				if self._frame_to_process is not None:
 					frame = self._frame_to_process
@@ -184,7 +186,7 @@ class InferenceEngine:
 				try:
 					results: list[DetectionResult] = self._process_frame(frame)
 					self._loop.call_soon_threadsafe(
-						self._output_queue.put_nowait, results
+						self._output_queue.put_nowait, (frame, results)
 					)
 				except Exception as e:
 					error_message = f"ERROR: Failed to process frame: {e}"

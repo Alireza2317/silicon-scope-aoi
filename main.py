@@ -6,7 +6,11 @@ from collections.abc import Generator
 
 import numpy as np
 
-from src.core.inference import DetectionResult, InferenceConfig, InferenceEngine
+from src.core.inference import (
+	InferenceConfig,
+	InferenceEngine,
+	QueueItem,
+)
 from src.sources.camera import generate_camera_frames
 from src.ui.app import SiliconScopeApp
 
@@ -26,7 +30,7 @@ def feed_worker(
 			break
 		engine.submit_frame(frame)
 
-		time.sleep(0.5)
+		time.sleep(0.01)
 
 
 def main() -> None:
@@ -38,7 +42,7 @@ def main() -> None:
 		format="%(asctime)s - %(levelname)s - %(message)s",
 	)
 	# Use an asyncio queue for non-blocking communication with the UI.
-	inference_queue: asyncio.Queue[list[DetectionResult] | str] = asyncio.Queue()
+	inference_queue: asyncio.Queue[QueueItem] = asyncio.Queue()
 	inference_config = InferenceConfig()  # type: ignore
 	stop_event = threading.Event()
 

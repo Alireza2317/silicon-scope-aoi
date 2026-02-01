@@ -1,13 +1,34 @@
-#main-container {
-    layout: vertical;
+/* app.tcss - Main stylesheet for the Silicon Scope application */
+
+Screen {
+    background: $surface;
+    color: $text;
 }
 
-#video-feed {
-    height: 70%;
-    border: round white;
+#main-grid {
+    layout: grid;
+    grid-size: 2 2; /* 2 columns, 2 rows */
+    grid-gutter: 1;
+    grid-rows: auto 1fr; /* Top row sized to content, bottom row takes remaining space */
+    padding: 0 1;
 }
 
-#log-view {
-    height: 30%;
-    border: round white;
+#stats,
+#fps {
+    height: 5;
+    content-align: center middle;
+}
+
+#stats {
+    border: round #666 ;
+}
+
+#fps {
+    border: round #666 ;
+}
+
+#log-container {
+    column-span: 2;
+    border: round #666 ;
+    padding: 0 1;
 }

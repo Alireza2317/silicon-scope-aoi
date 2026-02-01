@@ -8,10 +8,10 @@ import cv2
 from PIL import Image
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Container, Vertical
 from textual.screen import Screen
 from textual.widget import Widget
-from textual.widgets import Footer, Header, Static
+from textual.widgets import Footer, Header, Log, Static
 
 if TYPE_CHECKING:
 	from src.core.inference import DetectionResult, Frame
@@ -101,42 +101,38 @@ class VideoFeed(Static):
 		self.update(Text.from_ansi(ansi_frame_str))
 
 
-class LogPalette(Static):
-	"""A placeholder widget for logging output."""
+class DetectionStats(Static):
+	"""A widget to display detection statistics."""
 
-	def update_log(self, result: list[DetectionResult] | str) -> None:
-		"""Update the log with new results or an error message."""
+	def update_stats(self, detections: list[DetectionResult]) -> None:
+		"""Update the statistics with the latest detection data."""
+		self.update(f"Detections Found: [b]{len(detections)}[/b]")
 
-		if isinstance(result, str):
-			self.update(f"[bold red]ERROR[/]: {result}")
-		elif isinstance(result, list):
-			summary: str = f"Detections: {len(result)}\n"
-			summary += "\n".join(
-				f"  - {res.class_name} (Conf: {res.confidence:.2f})" for res in result
-			)
-			self.update(summary)
+
+class FPSDisplay(Static):
+	"""A widget to display the inference frames per second."""
+
+	def update_fps(self, fps: float) -> None:
+		"""Update the display with the current FPS."""
+		self.update(f"Inference FPS: [b]{fps:.2f}[/b]")
 
 
 class MainScreen(Screen[None]):
-	"""The main screen for the application.
-
-	It contains the video feed and a log palette.
-	"""
+	"""The main dashboard screen for the application."""
 
 	def __init__(self, *args: Any, **kwargs: Any) -> None:
 		super().__init__(*args, **kwargs)
-
-		self.header = Header()
-		self.footer = Footer()
-		self.video_feed = VideoFeed("Video Feed Placeholder", id="video-feed")
-		self.log_palette = LogPalette("Log Palette Placeholder", id="log-view")
+		self.stats_widget = DetectionStats("Detections Found: [b]0[/b]", id="stats")
+		self.fps_widget = FPSDisplay("Inference FPS: [b]0.00[/b]", id="fps")
+		self.log_widget = Log(max_lines=500, id="log")
 
 	def compose(self) -> ComposeResult:
 		"""Compose the layout of the main screen."""
-		yield Vertical(
-			self.header,
-			self.video_feed,
-			self.log_palette,
-			self.footer,
-			id="main-layout",
+		yield Header()
+		yield Container(
+			self.stats_widget,
+			self.fps_widget,
+			Container(self.log_widget, id="log-container"),
+			id="main-grid",
 		)
+		yield Footer()

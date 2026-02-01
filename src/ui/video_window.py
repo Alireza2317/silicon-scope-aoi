@@ -17,7 +17,8 @@ class VideoWindow:
 
 	def __init__(self, window_name: str = "High-Resolution Feed") -> None:
 		"""Initializes the video window."""
-		self.name = window_name
+		self.window_name = window_name
+		self._is_created = False
 
 	def update(self, frame: Frame, detections: list[DetectionResult]) -> None:
 		"""
@@ -44,9 +45,11 @@ class VideoWindow:
 				2,
 			)
 
-		cv2.imshow(self.name, display_frame)
+		cv2.imshow(self.window_name, display_frame)
+		self._is_created = True  # Mark the window as created
 		cv2.waitKey(1)  # Necessary for the window to update
 
 	def close(self) -> None:
-		"""Closes the video window."""
-		cv2.destroyWindow(self.name)
+		"""Closes the video window if it exists."""
+		if self._is_created:
+			cv2.destroyWindow(self.window_name)

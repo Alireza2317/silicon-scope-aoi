@@ -12,8 +12,8 @@ from textual.binding import Binding
 
 from src.core.inference import DetectionResult, Frame, InferenceEngine
 from src.io.snapshot import save_detection_snapshot
-from src.ui.screens import MainScreen
-from src.ui.video_window import VideoWindow
+from src.tui.screens import MainScreen
+from src.tui.video_window import VideoWindow
 
 
 class SiliconScopeApp(App[None]):

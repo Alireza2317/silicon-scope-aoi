@@ -49,6 +49,22 @@ class VideoWindow:
 		self._is_created = True  # Mark the window as created
 		cv2.waitKey(1)  # Necessary for the window to update
 
+	def is_closed(self) -> bool:
+		"""
+		Checks if the video window has been closed by the user.
+
+		Returns:
+			True if the window was closed, False otherwise.
+		"""
+		if not self._is_created:
+			return False
+		try:
+			# A visible window will have a property > 0. If it's closed, this will be < 1.
+			return cv2.getWindowProperty(self.window_name, cv2.WND_PROP_VISIBLE) < 1
+		except cv2.error:
+			# This can happen if the window is forcefully closed.
+			return True
+
 	def close(self) -> None:
 		"""Closes the video window if it exists."""
 		if self._is_created:
